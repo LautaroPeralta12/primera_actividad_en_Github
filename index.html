@@ -1,92 +1,127 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prueba de Conexión Supabase (Sin RLS)</title>
-  <!-- Supabase JS Client via CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
+document.addEventListener('DOMContentLoaded', () => {
+  loadProducts();
+
+  const form = document.getElementById('product-form');
+  form.addEventListener('submit', handleFormSubmit);
+});
+
+// Cargar productos desde Supabase (Lectura)
+async function loadProducts() {
+  const { data, error } = await supabaseClient
+    .from('productos')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  const tbody = document.getElementById('product-list');
+
+  if (error) {
+    console.error('Error al cargar productos:', error);
+    tbody.innerHTML = '<tr><td colspan="5">Error al cargar datos.</td></tr>';
+    return;
+  }
+
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay productos registrados.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(p => `
+    <tr>
+      <td><strong>${p.nombre}</strong></td>
+      <td>${p.categoria || 'Sin categoría'}</td>
+      <td>$${parseFloat(p.precio).toFixed(2)}</td>
+      <td>${p.stock > 0 ? p.stock : '<span class="badge-out">Sin Stock</span>'}</td>
+      <td class="actions">
+        <button onclick="editProduct(${p.id}, '${escapeQuotes(p.nombre)}', ${p.precio}, ${p.stock}, '${escapeQuotes(p.categoria || '')}')">Editar / Actualizar</button>
+        <button class="btn-cancel" onclick="deleteProduct(${p.id})">Eliminar</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// Agregar o actualizar un producto (Escritura)
+async function handleFormSubmit(e) {
+  e.preventDefault();
+
+  const id = document.getElementById('product-id').value;
+  const nombre = document.getElementById('nombre').value.trim();
+  const precio = parseFloat(document.getElementById('precio').value);
+  const stock = parseInt(document.getElementById('stock').value);
+  const categoria = document.getElementById('categoria').value.trim();
+
+  if (id) {
+    // Actualizar producto existente
+    const { error } = await supabaseClient
+      .from('productos')
+      .update({ nombre, precio, stock, categoria })
+      .eq('id', id);
+
+    if (error) {
+      alert('Error al actualizar el producto: ' + error.message);
+    } else {
+      alert('Producto actualizado con éxito');
     }
-    button {
-      padding: 10px 15px;
-      font-size: 14px;
-      cursor: pointer;
-      margin-right: 10px;
-      margin-bottom: 10px;
+  } else {
+    // Insertar nuevo producto
+    const { error } = await supabaseClient
+      .from('productos')
+      .insert([{ nombre, precio, stock, categoria }]);
+
+    if (error) {
+      alert('Error al agregar el producto: ' + error.message);
+    } else {
+      alert('Producto agregado con éxito');
     }
-    #status {
-      margin-top: 20px;
-      padding: 10px;
-      background-color: #f4f4f4;
-      border-radius: 4px;
-      white-space: pre-wrap;
-    }
-  </style>
-</head>
-<body>
+  }
 
-  <h2>Prueba de Conexión Supabase</h2>
+  resetForm();
+  loadProducts();
+}
 
-  <button onclick="testWrite()">1. Probar Escritura (INSERT)</button>
-  <button onclick="testRead()">2. Probar Lectura (SELECT)</button>
+// Cargar datos en el formulario para editar
+function editProduct(id, nombre, precio, stock, categoria) {
+  document.getElementById('product-id').value = id;
+  document.getElementById('nombre').value = nombre;
+  document.getElementById('precio').value = precio;
+  document.getElementById('stock').value = stock;
+  document.getElementById('categoria').value = categoria;
 
-  <div id="status">Haz clic en un botón para iniciar la prueba...</div>
+  document.getElementById('form-title').textContent = 'Editar Producto';
+  document.getElementById('btn-submit').textContent = 'Guardar Cambios';
+  document.getElementById('btn-cancel').style.display = 'inline-block';
+}
 
-  <script>
-    // Configuración de credenciales
-    const SUPABASE_URL = 'https://cgyuemfyzpqwgyvxkbmq.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_3UCGUuUDhugdtpHcZ1cnFg_bt7czoaL';
+// Eliminar un producto
+async function deleteProduct(id) {
+  if (!confirm('¿Seguro que deseas eliminar este producto?')) return;
 
-    // Inicializar cliente de Supabase
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const statusDiv = document.getElementById('status');
+  const { error } = await supabaseClient
+    .from('productos')
+    .delete()
+    .eq('id', id);
 
-    // Función para probar escritura
-    async function testWrite() {
-      statusDiv.textContent = 'Enviando registro de prueba...';
-      const testMessage = 'Registro de prueba creado el: ' + new Date().toLocaleString();
+  if (error) {
+    alert('Error al eliminar producto: ' + error.message);
+  } else {
+    loadProducts();
+  }
+}
 
-      const { data, error } = await supabaseClient
-        .from('test_connection')
-        .insert([{ message: testMessage }])
-        .select();
+// Limpiar formulario
+function resetForm() {
+  document.getElementById('product-id').value = '';
+  document.getElementById('product-form').reset();
+  document.getElementById('form-title').textContent = 'Agregar Nuevo Producto';
+  document.getElementById('btn-submit').textContent = 'Guardar Producto';
+  document.getElementById('btn-cancel').style.display = 'none';
+}
 
-      if (error) {
-        statusDiv.style.color = 'red';
-        statusDiv.textContent = 'Error de escritura:\n' + JSON.stringify(error, null, 2);
-      } else {
-        statusDiv.style.color = 'green';
-        statusDiv.textContent = '¡Escritura exitosa!\nRegistro insertado:\n' + JSON.stringify(data, null, 2);
-      }
-    }
+// Utilidad para escapar comillas en argumentos HTML
+function escapeQuotes(str) {
+  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+  
 
-    // Función para probar lectura
-    async function testRead() {
-      statusDiv.textContent = 'Consultando registros...';
+      
 
-      const { data, error } = await supabaseClient
-        .from('test_connection')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) {
-        statusDiv.style.color = 'red';
-        statusDiv.textContent = 'Error de lectura:\n' + JSON.stringify(error, null, 2);
-      } else {
-        statusDiv.style.color = 'green';
-        statusDiv.textContent = '¡Lectura exitosa!\nÚltimos registros:\n' + JSON.stringify(data, null, 2);
-      }
-    }
-  </script>
-
-</body>
-</html>
+     
