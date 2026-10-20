@@ -1,125 +1,60 @@
-document.addEventListener('DOMContentLoaded', () => {
-  loadProducts();
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Almacén</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Supabase JS Client via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
 
-  const form = document.getElementById('product-form');
-  form.addEventListener('submit', handleFormSubmit);
-});
+  <div class="container">
+    <h1>🛒 Almacén - Control de Productos</h1>
 
-// Cargar productos desde Supabase (Lectura)
-async function loadProducts() {
-  const { data, error } = await supabaseClient
-    .from('productos')
-    .select('*')
-    .order('created_at', { ascending: false });
+    <!-- Formulario para agregar / editar producto -->
+    <div class="card">
+      <h2 id="form-title">Agregar Nuevo Producto</h2>
+      <form id="product-form">
+        <input type="hidden" id="product-id">
+        <div class="form-grid">
+          <input type="text" id="nombre" placeholder="Nombre del producto" required>
+          <input type="number" id="precio" step="0.01" placeholder="Precio ($)" required>
+          <input type="number" id="stock" placeholder="Cantidad en Stock" required>
+          <input type="text" id="categoria" placeholder="Categoría (ej: Lácteos, Panadería)">
+        </div>
+        <button type="submit" id="btn-submit">Guardar Producto</button>
+        <button type="button" id="btn-cancel" class="btn-cancel" style="display: none;" onclick="resetForm()">Cancelar</button>
+      </form>
+    </div>
 
-  const tbody = document.getElementById('product-list');
+    <!-- Lista de productos -->
+    <div class="card">
+      <h2>Inventario de Productos</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th>Precio</th>
+            <th>Stock</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="product-list">
+          <tr>
+            <td colspan="5" style="text-align: center;">Cargando productos...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-  if (error) {
-    console.error('Error al cargar productos:', error);
-    tbody.innerHTML = '<tr><td colspan="5">Error al cargar datos.</td></tr>';
-    return;
-  }
-
-  if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay productos registrados.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = data.map(p => `
-    <tr>
-      <td><strong>${p.nombre}</strong></td>
-      <td>${p.categoria || 'Sin categoría'}</td>
-      <td>$${parseFloat(p.precio).toFixed(2)}</td>
-      <td>${p.stock > 0 ? p.stock : '<span class="badge-out">Sin Stock</span>'}</td>
-      <td class="actions">
-        <button onclick="editProduct(${p.id}, '${escapeQuotes(p.nombre)}', ${p.precio}, ${p.stock}, '${escapeQuotes(p.categoria || '')}')">Editar / Actualizar</button>
-        <button class="btn-cancel" onclick="deleteProduct(${p.id})">Eliminar</button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-// Agregar o actualizar un producto (Escritura)
-async function handleFormSubmit(e) {
-  e.preventDefault();
-
-  const id = document.getElementById('product-id').value;
-  const nombre = document.getElementById('nombre').value.trim();
-  const precio = parseFloat(document.getElementById('precio').value);
-  const stock = parseInt(document.getElementById('stock').value);
-  const categoria = document.getElementById('categoria').value.trim();
-
-  if (id) {
-    // Actualizar producto existente
-    const { error } = await supabaseClient
-      .from('productos')
-      .update({ nombre, precio, stock, categoria })
-      .eq('id', id);
-
-    if (error) {
-      alert('Error al actualizar el producto: ' + error.message);
-    } else {
-      alert('Producto actualizado con éxito');
-    }
-  } else {
-    // Insertar nuevo producto
-    const { error } = await supabaseClient
-      .from('productos')
-      .insert([{ nombre, precio, stock, categoria }]);
-
-    if (error) {
-      alert('Error al agregar el producto: ' + error.message);
-    } else {
-      alert('Producto agregado con éxito');
-    }
-  }
-
-  resetForm();
-  loadProducts();
-}
-
-// Cargar datos en el formulario para editar
-function editProduct(id, nombre, precio, stock, categoria) {
-  document.getElementById('product-id').value = id;
-  document.getElementById('nombre').value = nombre;
-  document.getElementById('precio').value = precio;
-  document.getElementById('stock').value = stock;
-  document.getElementById('categoria').value = categoria;
-
-  document.getElementById('form-title').textContent = 'Editar Producto';
-  document.getElementById('btn-submit').textContent = 'Guardar Cambios';
-  document.getElementById('btn-cancel').style.display = 'inline-block';
-}
-
-// Eliminar un producto
-async function deleteProduct(id) {
-  if (!confirm('¿Seguro que deseas eliminar este producto?')) return;
-
-  const { error } = await supabaseClient
-    .from('productos')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    alert('Error al eliminar producto: ' + error.message);
-  } else {
-    loadProducts();
-  }
-}
-
-// Limpiar formulario
-function resetForm() {
-  document.getElementById('product-id').value = '';
-  document.getElementById('product-form').reset();
-  document.getElementById('form-title').textContent = 'Agregar Nuevo Producto';
-  document.getElementById('btn-submit').textContent = 'Guardar Producto';
-  document.getElementById('btn-cancel').style.display = 'none';
-}
-
-// Utilidad para escapar comillas en argumentos HTML
-function escapeQuotes(str) {
-  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-}
+  <script src="conexion.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
   
 
       
