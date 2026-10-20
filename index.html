@@ -3,60 +3,90 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestión de Almacén</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Prueba de Conexión Supabase (Sin RLS)</title>
   <!-- Supabase JS Client via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      padding: 10px 15px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #f4f4f4;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+  </style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>🛒 Almacén - Control de Productos</h1>
+  <h2>Prueba de Conexión Supabase</h2>
 
-    <!-- Formulario para agregar / editar producto -->
-    <div class="card">
-      <h2 id="form-title">Agregar Nuevo Producto</h2>
-      <form id="product-form">
-        <input type="hidden" id="product-id">
-        <div class="form-grid">
-          <input type="text" id="nombre" placeholder="Nombre del producto" required>
-          <input type="number" id="precio" step="0.01" placeholder="Precio ($)" required>
-          <input type="number" id="stock" placeholder="Cantidad en Stock" required>
-          <input type="text" id="categoria" placeholder="Categoría (ej: Lácteos, Panadería)">
-        </div>
-        <button type="submit" id="btn-submit">Guardar Producto</button>
-        <button type="button" id="btn-cancel" class="btn-cancel" style="display: none;" onclick="resetForm()">Cancelar</button>
-      </form>
-    </div>
+  <button onclick="testWrite()">1. Probar Escritura (INSERT)</button>
+  <button onclick="testRead()">2. Probar Lectura (SELECT)</button>
 
-    <!-- Lista de productos -->
-    <div class="card">
-      <h2>Inventario de Productos</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Producto</th>
-            <th>Categoría</th>
-            <th>Precio</th>
-            <th>Stock</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="product-list">
-          <tr>
-            <td colspan="5" style="text-align: center;">Cargando productos...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <div id="status">Haz clic en un botón para iniciar la prueba...</div>
 
-  <script src="conexion.js"></script>
-  <script src="app.js"></script>
+  <script>
+    // Configuración de credenciales
+    const SUPABASE_URL = 'https://cgyuemfyzpqwgyvxkbmq.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_3UCGUuUDhugdtpHcZ1cnFg_bt7czoaL';
+
+    // Inicializar cliente de Supabase
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const statusDiv = document.getElementById('status');
+
+    // Función para probar escritura
+    async function testWrite() {
+      statusDiv.textContent = 'Enviando registro de prueba...';
+      const testMessage = 'Registro de prueba creado el: ' + new Date().toLocaleString();
+
+      const { data, error } = await supabaseClient
+        .from('test_connection')
+        .insert([{ message: testMessage }])
+        .select();
+
+      if (error) {
+        statusDiv.style.color = 'red';
+        statusDiv.textContent = 'Error de escritura:\n' + JSON.stringify(error, null, 2);
+      } else {
+        statusDiv.style.color = 'green';
+        statusDiv.textContent = '¡Escritura exitosa!\nRegistro insertado:\n' + JSON.stringify(data, null, 2);
+      }
+    }
+
+    // Función para probar lectura
+    async function testRead() {
+      statusDiv.textContent = 'Consultando registros...';
+
+      const { data, error } = await supabaseClient
+        .from('test_connection')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        statusDiv.style.color = 'red';
+        statusDiv.textContent = 'Error de lectura:\n' + JSON.stringify(error, null, 2);
+      } else {
+        statusDiv.style.color = 'green';
+        statusDiv.textContent = '¡Lectura exitosa!\nÚltimos registros:\n' + JSON.stringify(data, null, 2);
+      }
+    }
+  </script>
+
 </body>
 </html>
-  
-
-      
-
-     
