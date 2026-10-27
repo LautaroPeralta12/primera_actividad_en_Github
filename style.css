@@ -240,3 +240,66 @@ tbody tr:hover {
   margin-bottom: 18px;
   background: #fff;
 }
+
+/* ---------- Herramientas: buscador, filtro de rubro y vistas ---------- */
+.herramientas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.herramientas .buscador {
+  flex: 1 1 240px;
+  width: auto;
+  margin-bottom: 0;
+}
+
+select {
+  padding: 10px;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  font-size: 15px;
+  background: #fff;
+}
+
+.vistas {
+  display: flex;
+}
+
+.vistas .vista {
+  background: #fff;
+  color: #34495e;
+  border: 1px solid #34495e;
+  border-radius: 0;
+}
+
+.vistas .vista:first-child {
+  border-radius: 5px 0 0 5px;
+}
+
+.vistas .vista:last-child {
+  border-radius: 0 5px 5px 0;
+  border-left: none;
+}
+
+.vistas .vista.activo {
+  background: #34495e;
+  color: #fff;
+}
+
+.detalle {
+  color: #666;
+  font-size: 13px;
+}
+
+/* ---------- Vista tabla ---------- */
+.vista-tabla .card {
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.vista-tabla table td,
+.vista-tabla table th {
+  white-space: nowrap;
+}

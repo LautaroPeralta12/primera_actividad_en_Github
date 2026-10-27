@@ -2,7 +2,7 @@
 window.addEventListener('error', (e) => {
   const caja = document.getElementById('mensaje');
   if (caja) {
-    caja.textContent = 'Error en la página: ' + e.message + ' (revisá que index.html y app.js sean las versiones nuevas)';
+    caja.textContent = 'Error en la página: ' + e.message + ' (revisá que todos los archivos sean las versiones nuevas)';
     caja.className = 'mensaje error';
     caja.hidden = false;
   }
@@ -16,10 +16,16 @@ const form = document.getElementById('product-form');
 const contenedor = document.getElementById('product-list');
 const mensaje = document.getElementById('mensaje');
 const btnCancelar = document.getElementById('btn-cancelar');
-const listaCategorias = document.getElementById('lista-categorias');
+const listaRubros = document.getElementById('lista-rubros');
 const buscador = document.getElementById('buscador');
+const filtroRubro = document.getElementById('filtro-rubro');
+const btnVistaColumnas = document.getElementById('btn-vista-columnas');
+const btnVistaTabla = document.getElementById('btn-vista-tabla');
 
-let productos = []; // copia local para poder editar sin pasar datos por el HTML
+const SIN_RUBRO = 'Sin rubro';
+
+let productos = [];     // copia local para poder editar sin pasar datos por el HTML
+let vista = 'columnas'; // 'columnas' o 'tabla'
 
 // ---------- Utilidades ----------
 function mostrarMensaje(texto, tipo) {
@@ -41,10 +47,6 @@ function escapeHtml(valor) {
     .replace(/'/g, '&#39;');
 }
 
-function valorBuscador() {
-  return buscador ? buscador.value.trim() : '';
-}
-
 // Pasa a minúsculas y saca las tildes, para que "cafe" encuentre "Café"
 function normalizar(texto) {
   return String(texto ?? '')
@@ -53,17 +55,36 @@ function normalizar(texto) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-// Agrupa los productos por categoría (sin distinguir mayúsculas/minúsculas)
-// y deja "Sin categoría" siempre al final.
-function agruparPorCategoria(lista) {
+// Clave para comparar rubros: "lácteos" y "Lácteos" son el mismo
+function claveRubro(texto) {
+  return String(texto ?? '').trim().toLowerCase();
+}
+
+function valorBuscador() {
+  return buscador ? buscador.value.trim() : '';
+}
+
+// Traduce los errores de Supabase a mensajes entendibles
+function explicarError(error) {
+  if (error.code === '23505') {
+    return 'Ya existe un producto con ese código de barras.';
+  }
+  if (error.code === 'PGRST204' || /schema cache|does not exist/i.test(error.message || '')) {
+    return error.message + ' → Falta ejecutar migracion.sql en Supabase (SQL Editor).';
+  }
+  return error.message;
+}
+
+// Agrupa los productos por rubro y deja "Sin rubro" siempre al final
+function agruparPorRubro(lista) {
   const grupos = new Map();
 
   for (const p of lista) {
-    const nombre = (p.categoria || '').trim();
-    const clave = nombre.toLowerCase();
+    const nombre = (p.rubro || '').trim();
+    const clave = claveRubro(nombre);
 
     if (!grupos.has(clave)) {
-      grupos.set(clave, { nombre: nombre || 'Sin categoría', items: [] });
+      grupos.set(clave, { nombre: nombre || SIN_RUBRO, items: [] });
     }
     grupos.get(clave).items.push(p);
   }
@@ -80,12 +101,19 @@ function agruparPorCategoria(lista) {
     });
 }
 
-// Sugerencias de categorías ya usadas para el campo del formulario
-function actualizarSugerencias(grupos) {
-  listaCategorias.innerHTML = grupos
-    .filter(g => g.nombre !== 'Sin categoría')
+// Rubros ya usados: sugerencias del formulario y opciones del filtro
+function actualizarRubros() {
+  const rubros = agruparPorRubro(productos).filter(g => g.nombre !== SIN_RUBRO);
+
+  listaRubros.innerHTML = rubros
     .map(g => `<option value="${escapeHtml(g.nombre)}"></option>`)
     .join('');
+
+  const seleccionado = filtroRubro.value;
+  filtroRubro.innerHTML = '<option value="">Todos los rubros</option>' + rubros
+    .map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`)
+    .join('');
+  filtroRubro.value = rubros.some(g => g.nombre === seleccionado) ? seleccionado : '';
 }
 
 // ---------- Leer productos (SELECT) ----------
@@ -97,19 +125,26 @@ async function cargarProductos() {
 
   if (error) {
     console.error('Error al cargar productos:', error);
+    contenedor.className = 'categorias';
     contenedor.innerHTML = '<p class="vacio">No se pudieron cargar los productos.</p>';
-    mostrarMensaje('Error al leer la tabla "productos": ' + error.message, 'error');
+    mostrarMensaje('Error al leer la tabla "productos": ' + explicarError(error), 'error');
     return;
   }
 
   productos = data;
+
+  // Si la tabla todavía tiene la estructura vieja, avisamos
+  if (productos.length > 0 && !('rubro' in productos[0])) {
+    mostrarMensaje('La tabla "productos" todavía tiene la estructura vieja. Ejecutá migracion.sql en Supabase (SQL Editor) y recargá.', 'error');
+  }
+
   dibujarProductos();
 }
 
-// ---------- Dibujar las columnas (aplica el buscador) ----------
+// ---------- Dibujar (aplica buscador, filtro y vista) ----------
 function dibujarProductos() {
-  // Las sugerencias del formulario usan TODAS las categorías, no solo las filtradas
-  actualizarSugerencias(agruparPorCategoria(productos));
+  actualizarRubros();
+  contenedor.className = 'categorias';
 
   if (productos.length === 0) {
     contenedor.innerHTML = '<p class="vacio">Todavía no hay productos.</p>';
@@ -117,18 +152,44 @@ function dibujarProductos() {
   }
 
   const termino = normalizar(valorBuscador());
-  const filtrados = termino
-    ? productos.filter(p => normalizar(p.nombre).includes(termino))
-    : productos;
+  const rubroElegido = claveRubro(filtroRubro.value);
+
+  const filtrados = productos.filter(p => {
+    const coincideRubro = !rubroElegido || claveRubro(p.rubro) === rubroElegido;
+    const coincideTexto = !termino
+      || normalizar(p.nombre).includes(termino)
+      || normalizar(p.codigo_barras).includes(termino);
+    return coincideRubro && coincideTexto;
+  });
 
   if (filtrados.length === 0) {
-    contenedor.innerHTML = `<p class="vacio">No se encontraron productos para "${escapeHtml(valorBuscador())}".</p>`;
+    contenedor.innerHTML = '<p class="vacio">No se encontraron productos con ese filtro.</p>';
     return;
   }
 
-  const grupos = agruparPorCategoria(filtrados);
+  if (vista === 'tabla') {
+    contenedor.className = 'vista-tabla';
+    contenedor.innerHTML = htmlTabla(filtrados);
+  } else {
+    contenedor.innerHTML = htmlColumnas(filtrados);
+  }
+}
 
-  contenedor.innerHTML = grupos.map(grupo => `
+function htmlCantidad(p) {
+  return p.stock > 0 ? p.stock : '<span class="sin-stock">Sin stock</span>';
+}
+
+function htmlBotones(p) {
+  return `
+    <div class="acciones">
+      <button type="button" data-accion="editar" data-id="${p.id}">Editar</button>
+      <button type="button" data-accion="eliminar" data-id="${p.id}" class="peligro">Eliminar</button>
+    </div>`;
+}
+
+// Vista 1: una columna por rubro
+function htmlColumnas(lista) {
+  return agruparPorRubro(lista).map(grupo => `
     <section class="columna">
       <h3>${escapeHtml(grupo.nombre)} <span class="contador">${grupo.items.length}</span></h3>
       <ul class="productos">
@@ -136,20 +197,59 @@ function dibujarProductos() {
           <li class="producto">
             <div class="producto-info">
               <strong>${escapeHtml(p.nombre)}</strong>
+              ${p.subrubro ? `<span class="detalle">${escapeHtml(p.subrubro)}</span>` : ''}
               <span class="precio">$${Number(p.precio).toFixed(2)}</span>
-              ${p.stock > 0
-                ? `<span class="stock">Stock: ${p.stock}</span>`
-                : '<span class="sin-stock">Sin stock</span>'}
+              <span class="stock">Cantidad: ${htmlCantidad(p)}</span>
+              ${p.codigo_barras ? `<span class="detalle">Cód: ${escapeHtml(p.codigo_barras)}</span>` : ''}
             </div>
-            <div class="acciones">
-              <button type="button" data-accion="editar" data-id="${p.id}">Editar</button>
-              <button type="button" data-accion="eliminar" data-id="${p.id}" class="peligro">Eliminar</button>
-            </div>
+            ${htmlBotones(p)}
           </li>
         `).join('')}
       </ul>
     </section>
   `).join('');
+}
+
+// Vista 2: tabla con las columnas de la guía del profe
+function htmlTabla(lista) {
+  return `
+    <div class="tabla-scroll card">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Cód. barras</th>
+            <th>Nombre</th>
+            <th>Rubro</th>
+            <th>Subrubro</th>
+            <th>Precio</th>
+            <th>Cantidad</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lista.map(p => `
+            <tr>
+              <td>${p.id}</td>
+              <td>${escapeHtml(p.codigo_barras)}</td>
+              <td><strong>${escapeHtml(p.nombre)}</strong></td>
+              <td>${escapeHtml(p.rubro)}</td>
+              <td>${escapeHtml(p.subrubro)}</td>
+              <td>$${Number(p.precio).toFixed(2)}</td>
+              <td>${htmlCantidad(p)}</td>
+              <td>${htmlBotones(p)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function cambiarVista(nueva) {
+  vista = nueva;
+  btnVistaColumnas.classList.toggle('activo', vista === 'columnas');
+  btnVistaTabla.classList.toggle('activo', vista === 'tabla');
+  dibujarProductos();
 }
 
 // ---------- Agregar / actualizar (INSERT / UPDATE) ----------
@@ -159,8 +259,10 @@ async function guardarProducto(e) {
 
   const id = document.getElementById('product-id').value;
   const producto = {
+    codigo_barras: document.getElementById('codigo_barras').value.trim() || null,
     nombre: document.getElementById('nombre').value.trim(),
-    categoria: document.getElementById('categoria').value.trim(),
+    rubro: document.getElementById('rubro').value.trim() || null,
+    subrubro: document.getElementById('subrubro').value.trim() || null,
     precio: parseFloat(document.getElementById('precio').value),
     stock: parseInt(document.getElementById('stock').value, 10)
   };
@@ -174,7 +276,7 @@ async function guardarProducto(e) {
 
   if (error) {
     console.error('Error al guardar:', error);
-    mostrarMensaje('No se pudo guardar: ' + error.message, 'error');
+    mostrarMensaje('No se pudo guardar: ' + explicarError(error), 'error');
     return;
   }
 
@@ -189,8 +291,10 @@ function editarProducto(id) {
   if (!p) return;
 
   document.getElementById('product-id').value = p.id;
+  document.getElementById('codigo_barras').value = p.codigo_barras || '';
   document.getElementById('nombre').value = p.nombre;
-  document.getElementById('categoria').value = p.categoria || '';
+  document.getElementById('rubro').value = p.rubro || '';
+  document.getElementById('subrubro').value = p.subrubro || '';
   document.getElementById('precio').value = p.precio;
   document.getElementById('stock').value = p.stock;
 
@@ -208,7 +312,7 @@ async function eliminarProducto(id) {
 
   if (error) {
     console.error('Error al eliminar:', error);
-    mostrarMensaje('No se pudo eliminar: ' + error.message, 'error');
+    mostrarMensaje('No se pudo eliminar: ' + explicarError(error), 'error');
     return;
   }
 
@@ -228,9 +332,12 @@ function limpiarFormulario() {
 // ---------- Eventos ----------
 form.addEventListener('submit', guardarProducto);
 btnCancelar.addEventListener('click', limpiarFormulario);
-if (buscador) buscador.addEventListener('input', dibujarProductos);
+buscador.addEventListener('input', dibujarProductos);
+filtroRubro.addEventListener('change', dibujarProductos);
+btnVistaColumnas.addEventListener('click', () => cambiarVista('columnas'));
+btnVistaTabla.addEventListener('click', () => cambiarVista('tabla'));
 
-// Un solo listener para todos los botones de las columnas
+// Un solo listener para todos los botones Editar / Eliminar (sirve para las dos vistas)
 contenedor.addEventListener('click', (e) => {
   const boton = e.target.closest('button[data-accion]');
   if (!boton) return;

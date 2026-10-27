@@ -23,17 +23,23 @@
         <input type="hidden" id="product-id">
 
         <div class="form-grid">
+          <label>Código de barras
+            <input type="text" id="codigo_barras" inputmode="numeric" autocomplete="off">
+          </label>
           <label>Nombre
             <input type="text" id="nombre" required>
           </label>
-          <label>Categoría
-            <input type="text" id="categoria" list="lista-categorias" placeholder="Ej: Lácteos">
-            <datalist id="lista-categorias"></datalist>
+          <label>Rubro
+            <input type="text" id="rubro" list="lista-rubros" placeholder="Ej: Lácteos">
+            <datalist id="lista-rubros"></datalist>
+          </label>
+          <label>Subrubro
+            <input type="text" id="subrubro" placeholder="Ej: Leches">
           </label>
           <label>Precio
             <input type="number" id="precio" step="0.01" min="0" required>
           </label>
-          <label>Stock
+          <label>Cantidad
             <input type="number" id="stock" min="0" step="1" required>
           </label>
         </div>
@@ -45,11 +51,20 @@
       </form>
     </section>
 
-    <h2>Productos por categoría</h2>
+    <h2>Productos</h2>
 
-    <input type="search" id="buscador" class="buscador" placeholder="Buscar producto por nombre..." autocomplete="off">
+    <div class="herramientas">
+      <input type="search" id="buscador" class="buscador" placeholder="Buscar por nombre o código de barras..." autocomplete="off">
+      <select id="filtro-rubro" aria-label="Filtrar por rubro">
+        <option value="">Todos los rubros</option>
+      </select>
+      <div class="vistas" role="group" aria-label="Tipo de vista">
+        <button type="button" id="btn-vista-columnas" class="vista activo">Columnas</button>
+        <button type="button" id="btn-vista-tabla" class="vista">Tabla</button>
+      </div>
+    </div>
 
-    <!-- Acá se dibuja una columna por categoría -->
+    <!-- Acá se dibujan los productos -->
     <div id="product-list" class="categorias">
       <p class="vacio">Cargando...</p>
     </div>
