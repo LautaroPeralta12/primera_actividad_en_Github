@@ -61,6 +61,28 @@
       </form>
     </section>
 
+    <details class="card importar">
+      <summary>Importar productos desde un CSV</summary>
+
+      <p class="ayuda">
+        La primera fila del archivo tiene que tener los encabezados
+        <code>codigo_barras; nombre; rubro; subrubro; precio; cantidad</code>.
+        Son obligatorios <strong>nombre</strong>, <strong>precio</strong> y <strong>cantidad</strong>.
+        <a href="productos_ejemplo.csv" download>Descargar archivo de ejemplo</a>
+      </p>
+
+      <label>Archivo CSV
+        <input type="file" id="archivo-csv" accept=".csv,text/csv">
+      </label>
+
+      <div id="vista-previa-csv" hidden></div>
+
+      <div class="botones">
+        <button type="button" id="btn-importar" hidden>Importar</button>
+        <button type="button" id="btn-cancelar-importar" class="secundario" hidden>Cancelar</button>
+      </div>
+    </details>
+
     <h2>Lista de productos</h2>
 
     <div class="herramientas">
@@ -83,5 +105,6 @@
   <!-- Primero la conexión, después la lógica -->
   <script src="conexion.js"></script>
   <script src="app.js"></script>
+  <script src="importar.js"></script>
 </body>
 </html>
