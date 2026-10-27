@@ -1,3 +1,13 @@
+// Si algo falla, lo mostramos en la página en vez de quedarnos en "Cargando..."
+window.addEventListener('error', (e) => {
+  const caja = document.getElementById('mensaje');
+  if (caja) {
+    caja.textContent = 'Error en la página: ' + e.message + ' (revisá que index.html y app.js sean las versiones nuevas)';
+    caja.className = 'mensaje error';
+    caja.hidden = false;
+  }
+});
+
 // ---------- Referencias al HTML ----------
 const form = document.getElementById('product-form');
 const contenedor = document.getElementById('product-list');
@@ -26,6 +36,10 @@ function escapeHtml(valor) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function valorBuscador() {
+  return buscador ? buscador.value.trim() : '';
 }
 
 // Pasa a minúsculas y saca las tildes, para que "cafe" encuentre "Café"
@@ -99,13 +113,13 @@ function dibujarProductos() {
     return;
   }
 
-  const termino = normalizar(buscador.value.trim());
+  const termino = normalizar(valorBuscador());
   const filtrados = termino
     ? productos.filter(p => normalizar(p.nombre).includes(termino))
     : productos;
 
   if (filtrados.length === 0) {
-    contenedor.innerHTML = `<p class="vacio">No se encontraron productos para "${escapeHtml(buscador.value.trim())}".</p>`;
+    contenedor.innerHTML = `<p class="vacio">No se encontraron productos para "${escapeHtml(valorBuscador())}".</p>`;
     return;
   }
 
@@ -211,7 +225,7 @@ function limpiarFormulario() {
 // ---------- Eventos ----------
 form.addEventListener('submit', guardarProducto);
 btnCancelar.addEventListener('click', limpiarFormulario);
-buscador.addEventListener('input', dibujarProductos);
+if (buscador) buscador.addEventListener('input', dibujarProductos);
 
 // Un solo listener para todos los botones de las columnas
 contenedor.addEventListener('click', (e) => {
